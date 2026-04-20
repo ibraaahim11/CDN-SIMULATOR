@@ -1,0 +1,869 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CDN Simulator</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
+            color: #333;
+        }
+
+        .container {
+            max-width: 100%;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        header {
+            background: linear-gradient(135deg, #2E75B6 0%, #1e5299 100%);
+            color: white;
+            padding: 12px 16px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        header h1 {
+            margin: 0;
+            font-size: 22px;
+        }
+
+        .controls {
+            background: white;
+            padding: 12px 16px;
+            display: grid;
+            grid-template-columns: repeat(5, minmax(120px, 1fr));
+            gap: 10px;
+            border-bottom: 1px solid #ddd;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .control-group label {
+            font-weight: 600;
+            font-size: 13px;
+            text-transform: uppercase;
+            color: #666;
+        }
+
+        .control-group input[type="range"] {
+            width: 100%;
+            height: 6px;
+            cursor: pointer;
+        }
+
+        .control-group input[type="range"]::-webkit-slider-thumb {
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #2E75B6;
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .control-group input[type="range"]::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #2E75B6;
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .value-display {
+            font-weight: 600;
+            color: #2E75B6;
+            font-size: 14px;
+        }
+
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: #2E75B6;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #1e5299;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(46, 117, 182, 0.3);
+        }
+
+        .btn-danger {
+            background: #d32f2f;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #b71c1c;
+        }
+
+        .btn-danger.active {
+            background: #1b5e20;
+        }
+
+        .btn-secondary {
+            background: #666;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #555;
+        }
+
+        .main-content {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 1.15fr 0.85fr;
+            grid-template-rows: 1.38fr 0.62fr;
+            gap: 10px;
+            padding: 10px;
+            overflow: hidden;
+            min-height: 0;
+            align-items: stretch;
+        }
+
+        .panel {
+            background: white;
+            border-radius: 8px;
+            padding: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+            overflow: hidden;
+        }
+
+        .metrics-panel {
+            overflow-y: auto;
+        }
+
+        .panel h2 {
+            margin-bottom: 6px;
+            font-size: 15px;
+            color: #333;
+        }
+
+        #canvas {
+            flex: 1;
+            border: 1px solid #eee;
+            border-radius: 4px;
+            background: #fafafa;
+            width: 100%;
+            height: 100%;
+            min-height: 0;
+            display: block;
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+            margin-bottom: 8px;
+        }
+
+        .metric {
+            background: #f9f9f9;
+            padding: 7px 8px;
+            border-radius: 6px;
+            border-left: 4px solid #2E75B6;
+        }
+
+        .metric-label {
+            font-size: 10px;
+            color: #666;
+            text-transform: uppercase;
+            font-weight: 600;
+            margin-bottom: 2px;
+        }
+
+        .metric-value {
+            font-size: 18px;
+            font-weight: 700;
+            color: #2E75B6;
+            line-height: 1.1;
+        }
+
+        .metric-sub {
+            font-size: 10px;
+            color: #999;
+            margin-top: 2px;
+        }
+
+        #edgeStatus {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 4px;
+            overflow-y: visible;
+            flex: 0 0 auto;
+            min-height: auto;
+        }
+
+        .chart-panel > div {
+            flex: 1;
+            width: 100%;
+            min-height: 0;
+        }
+
+        
+
+        .status-box {
+            padding: 12px;
+            border-radius: 4px;
+            font-size: 14px;
+            font-weight: 600;
+            margin: 10px 0;
+        }
+
+        .status-running {
+            background: #c8e6c9;
+            color: #2e7d32;
+            border-left: 4px solid #2e7d32;
+        }
+
+        .status-paused {
+            background: #fff3cd;
+            color: #856404;
+            border-left: 4px solid #ffc107;
+        }
+
+        .status-warning {
+            background: #ffcdd2;
+            color: #c62828;
+            border-left: 4px solid #d32f2f;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🌐 CDN Simulator - Real-Time Visualization</h1>
+        </header>
+
+        <div class="controls">
+            <div class="control-group">
+                <label for="requestRate">Requests/sec</label>
+                <input type="range" id="requestRate" min="1" max="100" value="20" step="1">
+                <div class="value-display"><span id="rateValue">20</span> req/s</div>
+            </div>
+
+            <div class="control-group">
+                <label for="ttlSlider">Cache TTL (sec)</label>
+                <input type="range" id="ttlSlider" min="5" max="600" value="300" step="5">
+                <div class="value-display"><span id="ttlValue">300</span>s</div>
+            </div>
+
+            <div class="control-group">
+                <button id="killOriginBtn" class="btn-danger">🔴 Toggle Origin B</button>
+                <span id="originStatus" class="value-display">Origin B: ACTIVE ✅</span>
+            </div>
+
+            <div class="control-group">
+                <button id="toggleBtn" class="btn-primary">▶️ Start</button>
+                <span id="simStatus" class="status-running">✅ Ready</span>
+            </div>
+
+            <div class="control-group">
+                <button id="resetBtn" class="btn-secondary">🔄 Reset</button>
+                <span class="value-display">Clear metrics</span>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <!-- Left Top: Canvas -->
+            <div class="panel">
+                <h2>Request Flow Visualization</h2>
+                <canvas id="canvas"></canvas>
+            </div>
+
+            <!-- Right Top: Metrics -->
+            <div class="panel metrics-panel">
+                <h2>Live Metrics</h2>
+                <div class="metrics-grid">
+                    <div class="metric">
+                        <div class="metric-label">Cache Hit Rate</div>
+                        <div class="metric-value"><span id="hitRate">0</span>%</div>
+                        <div class="metric-sub"><span id="hitCount">0</span> hits</div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-label">Avg Latency</div>
+                        <div class="metric-value"><span id="avgLatency">0</span>ms</div>
+                        <div class="metric-sub">Lower is better</div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-label">Origin Load</div>
+                        <div class="metric-value"><span id="originLoad">0</span></div>
+                        <div class="metric-sub"><span id="originReqs">0</span> requests</div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-label">Total Requests</div>
+                        <div class="metric-value"><span id="totalReqs">0</span></div>
+                        <div class="metric-sub">Processed</div>
+                    </div>
+                </div>
+
+                <h3 style="margin-top: 6px; margin-bottom: 4px; font-size: 12px;">Edge Server Cache</h3>
+                <div id="edgeStatus">
+                    <!-- Filled by JS -->
+                </div>
+            </div>
+
+            <!-- Left Bottom: Latency Chart -->
+            <div class="panel chart-panel">
+                <h2>Latency Trend</h2>
+                <div id="latencyChart"></div>
+            </div>
+
+            <!-- Right Bottom: Hit Rate Chart -->
+            <div class="panel chart-panel">
+                <h2>Cache Hit Rate Trend</h2>
+                <div id="hitRateChart"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const EDGE_CAPACITY = 35; // load units at which an edge is considered "100%"
+        const EDGE_DECAY_PER_FRAME = 0.22;
+        const ORIGIN_DECAY_PER_FRAME = 0.18;
+
+        // =====================================================================
+        // SIMULATION STATE
+        // =====================================================================
+        const state = {
+            running: false,
+            requestRate: 20,
+            ttl: 300,
+            requestAccumulator: 0,
+            userWeights: { A: 0.5, B: 0.3, C: 0.2 },
+            
+            totalRequests: 0,
+            cacheHits: 0,
+            cacheMisses: 0,
+            originRequests: 0,
+            
+            latencyHistory: [],
+            hitRateHistory: [],
+            originLoadHistory: [],
+            timeHistory: [],
+            
+            edges: {
+                'US': { x: 200, y: 80, cache: {}, load: 0, baseLatency: 30, active: true },
+                'EU': { x: 200, y: 230, cache: {}, load: 0, baseLatency: 35, active: true },
+                'ASIA': { x: 200, y: 370, cache: {}, load: 0, baseLatency: 40, active: true }
+            },
+            
+            users: {
+                'A': { x: 30, y: 90, weight: 0.5, latencyToEdge: { US: 15, EU: 55, ASIA: 95 } },
+                'B': { x: 30, y: 230, weight: 0.3, latencyToEdge: { US: 45, EU: 20, ASIA: 70 } },
+                'C': { x: 30, y: 360, weight: 0.2, latencyToEdge: { US: 90, EU: 60, ASIA: 18 } }
+            },
+
+            origins: {
+                'A': { x: 550, y: 170, load: 0, baseLatency: 135, active: true },
+                'B': { x: 550, y: 290, load: 0, baseLatency: 145, active: true }
+            },
+            originPointer: 0,
+            
+            requestLog: [],
+            animatingDots: []
+        };
+
+        // =====================================================================
+        // CONTROLS
+        // =====================================================================
+        document.getElementById('requestRate').addEventListener('input', (e) => {
+            state.requestRate = parseInt(e.target.value);
+            document.getElementById('rateValue').textContent = state.requestRate;
+        });
+
+        document.getElementById('ttlSlider').addEventListener('input', (e) => {
+            state.ttl = parseInt(e.target.value);
+            document.getElementById('ttlValue').textContent = state.ttl;
+        });
+
+        document.getElementById('killOriginBtn').addEventListener('click', () => {
+            state.origins.B.active = !state.origins.B.active;
+            document.getElementById('originStatus').textContent = 
+                `Origin B: ${state.origins.B.active ? 'ACTIVE ✅' : 'DOWN ⚠️'}`;
+            document.getElementById('killOriginBtn').classList.toggle('active', !state.origins.B.active);
+        });
+
+        document.getElementById('toggleBtn').addEventListener('click', () => {
+            state.running = !state.running;
+            document.getElementById('toggleBtn').textContent = state.running ? '⏸️ Stop' : '▶️ Start';
+            document.getElementById('toggleBtn').style.background = state.running ? '#ff9800' : '#2E75B6';
+            document.getElementById('simStatus').textContent = state.running ? '✅ RUNNING' : '⏸️ PAUSED';
+            document.getElementById('simStatus').className = state.running ? 'status-running' : 'status-paused';
+        });
+
+        document.getElementById('resetBtn').addEventListener('click', () => {
+            state.totalRequests = 0;
+            state.cacheHits = 0;
+            state.cacheMisses = 0;
+            state.originRequests = 0;
+            state.latencyHistory = [];
+            state.hitRateHistory = [];
+            state.originLoadHistory = [];
+            state.timeHistory = [];
+            state.requestLog = [];
+            state.animatingDots = [];
+            state.requestAccumulator = 0;
+            
+            for (let edge of Object.values(state.edges)) {
+                edge.cache = {};
+                edge.load = 0;
+                edge.active = true;
+            }
+            for (let origin of Object.values(state.origins)) {
+                origin.load = 0;
+                origin.active = true;
+            }
+            state.userWeights = { A: 0.5, B: 0.3, C: 0.2 };
+            document.getElementById('originStatus').textContent = 'Origin B: ACTIVE ✅';
+            document.getElementById('killOriginBtn').classList.remove('active');
+        });
+
+        // =====================================================================
+        // SIMULATION LOGIC
+        // =====================================================================
+        // Picks a user group randomly based on the configured weights
+        function pickUserGroup() {
+            const r = Math.random();
+            let cumulative = 0;
+            for (const name of Object.keys(state.users)) {
+                cumulative += state.userWeights[name] ?? 0;
+                if (r <= cumulative) return name;
+            }
+            return 'A';
+        }
+
+        // Selects the best edge server for a given user group based on latency and load
+        function getBestEdge(userName) {
+            let best = null;
+            let bestScore = Infinity;
+            const user = state.users[userName];
+            const activeEdges = Object.values(state.edges).filter(edge => edge.active);
+            const avgLoad = activeEdges.length > 0
+                ? activeEdges.reduce((sum, edge) => sum + edge.load, 0) / activeEdges.length
+                : 0;
+            
+            for (let [name, edge] of Object.entries(state.edges)) {
+                if (!edge.active) continue;
+
+                // Keep latency-aware routing, but strongly discourage overloaded/imbalanced edges.
+                const latencyScore = user.latencyToEdge[name] + edge.baseLatency;
+                const loadScore = edge.load * 2.2;
+                const imbalancePenalty = Math.max(0, edge.load - avgLoad) * 4.0;
+                const overloadPenalty = edge.load > 28 ? (edge.load - 28) * 7.5 : 0;
+                const score = latencyScore + loadScore + imbalancePenalty + overloadPenalty;
+
+                if (score < bestScore) {
+                    bestScore = score;
+                    best = name;
+                }
+            }
+            return best;
+        }
+
+        // Returns a list of active origin servers
+        function getActiveOrigins() {
+            return Object.entries(state.origins).filter(([, origin]) => origin.active);
+        }
+
+        // Selects an origin server in a round-robin fashion from active origins
+        function pickOrigin() {
+            const active = getActiveOrigins();
+            if (active.length === 0) return null;
+            state.originPointer = (state.originPointer + 1) % active.length;
+            return active[state.originPointer];
+        }
+
+        // Simulates processing a single request, including cache check, routing, and metrics update
+        function processRequest() {
+            const userName = pickUserGroup();
+            const edgeName = getBestEdge(userName);
+            if (!edgeName) return;
+            const edge = state.edges[edgeName];
+            const contentId = Math.floor(Math.random() * 50);
+            
+            let isHit = false;
+            let latency = 0;
+            let wentToOrigin = false;
+            let originName = null;
+            
+            // Check cache
+            if (edge.cache[contentId] && Date.now() - edge.cache[contentId].time < state.ttl * 1000) {
+                isHit = true;
+                latency = edge.baseLatency;
+                state.cacheHits++;
+            } else {
+                // Cache miss
+                state.cacheMisses++;
+                const originSelection = pickOrigin();
+                if (originSelection) {
+                    originName = originSelection[0];
+                    const origin = originSelection[1];
+                    latency = edge.baseLatency + origin.baseLatency;
+                    origin.load += 1;
+                    state.originRequests++;
+                    wentToOrigin = true;
+                    
+                    // Cache the content
+                    edge.cache[contentId] = { time: Date.now() };
+                } else {
+                    latency = edge.baseLatency + 220; // degraded when all origins are down
+                }
+            }
+            
+            state.totalRequests++;
+            edge.load += 1;
+            
+            // Log request
+            state.requestLog.push({
+                time: Date.now(),
+                user: userName,
+                edge: edgeName,
+                hit: isHit,
+                latency: latency,
+                origin: originName,
+                failed: !isHit && !wentToOrigin
+            });
+            
+            // Create animating dot
+            if (state.requestLog.length > 0) {
+                state.animatingDots.push({
+                    startTime: Date.now(),
+                    user: userName,
+                    edge: edgeName,
+                    hit: isHit,
+                    origin: originName
+                });
+            }
+            
+            // Record metrics
+            const hitRate = state.totalRequests > 0 ? (state.cacheHits / state.totalRequests) * 100 : 0;
+            state.hitRateHistory.push(hitRate);
+            state.latencyHistory.push(latency);
+            const totalOriginLoad = Object.values(state.origins).reduce((sum, o) => sum + o.load, 0);
+            state.originLoadHistory.push(totalOriginLoad);
+            state.timeHistory.push(state.totalRequests);
+            
+        }
+
+        // Advances the simulation by one step, decaying loads and processing accumulated requests
+        function simulateStep() {
+            // Time-based decay so load drops naturally when traffic pressure decreases.
+            for (let edge of Object.values(state.edges)) {
+                edge.load = Math.max(0, edge.load - EDGE_DECAY_PER_FRAME);
+            }
+            for (let origin of Object.values(state.origins)) {
+                origin.load = Math.max(0, origin.load - ORIGIN_DECAY_PER_FRAME);
+            }
+
+            // Accumulator ensures low rates (e.g. 5-20 req/s) still emit requests smoothly.
+            state.requestAccumulator += state.requestRate / 60;
+            while (state.requestAccumulator >= 1) {
+                processRequest();
+                state.requestAccumulator -= 1;
+            }
+        }
+
+        // =====================================================================
+        // RENDERING
+        // =====================================================================
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        // Resizes the canvas to match the display and handles Plotly chart resizing
+        function resizeCanvas() {
+            const dpr = window.devicePixelRatio || 1;
+            canvas.width = Math.floor(canvas.clientWidth * dpr);
+            canvas.height = Math.floor(canvas.clientHeight * dpr);
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+            ctx.scale(dpr, dpr);
+            if (window.Plotly) {
+                Plotly.Plots.resize(document.getElementById('latencyChart'));
+                Plotly.Plots.resize(document.getElementById('hitRateChart'));
+            }
+        }
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+
+        // Renders the visualization on the canvas, including nodes, connections, and animating dots
+        function draw() {
+            const cssWidth = canvas.clientWidth;
+            const cssHeight = canvas.clientHeight;
+            ctx.clearRect(0, 0, cssWidth, cssHeight);
+            const jitter = 0;
+            
+            // Better scaling: fit content in 80% of canvas
+            const padding = 8;
+            const contentWidth = 560;
+            const contentHeight = 420;
+            const scaleX = (cssWidth - 2 * padding) / contentWidth;
+            const scaleY = (cssHeight - 2 * padding) / contentHeight;
+            const scale = Math.min(scaleX, scaleY);
+            const offsetX = (cssWidth - contentWidth * scale) / 2;
+            const offsetY = (cssHeight - contentHeight * scale) / 2;
+
+            // Draw connections
+            ctx.strokeStyle = '#ddd';
+            ctx.lineWidth = 2.4;
+            
+            for (let edge of Object.values(state.edges)) {
+                if (!edge.active) continue;
+                // User groups to edge links
+                for (let user of Object.values(state.users)) {
+                    ctx.beginPath();
+                    ctx.moveTo(user.x * scale + offsetX + jitter, user.y * scale + offsetY + jitter);
+                    ctx.lineTo(edge.x * scale + offsetX + jitter, edge.y * scale + offsetY + jitter);
+                    ctx.stroke();
+                }
+
+                // Edge to origins links
+                for (let origin of getActiveOrigins().map(([, item]) => item)) {
+                    ctx.beginPath();
+                    ctx.moveTo(edge.x * scale + offsetX + jitter, edge.y * scale + offsetY + jitter);
+                    ctx.lineTo(origin.x * scale + offsetX + jitter, origin.y * scale + offsetY + jitter);
+                    ctx.setLineDash([5, 5]);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                }
+            }
+
+            // Draw USER group nodes
+            for (let [name, user] of Object.entries(state.users)) {
+                ctx.fillStyle = '#2E75B6';
+                ctx.beginPath();
+                ctx.arc(user.x * scale + offsetX + jitter, user.y * scale + offsetY + jitter, 18 * scale, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.fillStyle = 'white';
+                ctx.font = `bold ${13 * scale}px Arial`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(name, user.x * scale + offsetX + jitter, user.y * scale + offsetY + jitter);
+
+                ctx.fillStyle = '#2E75B6';
+                ctx.font = `${12 * scale}px Arial`;
+                ctx.fillText(`User ${name}`, user.x * scale + offsetX + jitter, (user.y + 28) * scale + offsetY + jitter);
+            }
+
+            // Draw EDGE nodes
+            for (let [name, edge] of Object.entries(state.edges)) {
+                let color = '#4caf50';
+                if (!edge.active) color = '#9e9e9e';
+                else if (edge.load > 50) color = '#f44336';
+                else if (edge.load > 25) color = '#ff9800';
+                
+                const loadPct = Math.min(100, (edge.load / EDGE_CAPACITY) * 100);
+                const edgeX = edge.x * scale + offsetX + jitter;
+                const edgeY = edge.y * scale + offsetY + jitter;
+
+                // Load ring around edge node for direct distribution visibility.
+                ctx.strokeStyle = '#e0e0e0';
+                ctx.lineWidth = 5 * scale;
+                ctx.beginPath();
+                ctx.arc(edgeX, edgeY, 31 * scale, -Math.PI / 2, Math.PI * 1.5);
+                ctx.stroke();
+
+                ctx.strokeStyle = loadPct > 75 ? '#e53935' : loadPct > 40 ? '#f9a825' : '#43a047';
+                ctx.beginPath();
+                ctx.arc(edgeX, edgeY, 31 * scale, -Math.PI / 2, (-Math.PI / 2) + (Math.PI * 2 * loadPct / 100));
+                ctx.stroke();
+
+                ctx.fillStyle = color;
+                ctx.beginPath();
+                const pulse = edge.load > 50 ? (Math.sin(Date.now() / 120) + 1) * 1.5 : 0;
+                ctx.arc(edgeX, edgeY, (26 + pulse) * scale, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Edge label
+                ctx.fillStyle = 'white';
+                ctx.font = `bold ${13 * scale}px Arial`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(name, edgeX, edgeY);
+
+                ctx.fillStyle = '#455a64';
+                ctx.font = `bold ${10 * scale}px Arial`;
+                ctx.fillText(`${Math.round(loadPct)}%`, edgeX, (edge.y + 36) * scale + offsetY + jitter);
+            }
+
+            // Draw ORIGIN nodes
+            for (let [name, origin] of Object.entries(state.origins)) {
+                const originColor = origin.active ? '#1b5e20' : '#b71c1c';
+                ctx.fillStyle = originColor;
+                ctx.beginPath();
+                ctx.roundRect(
+                    (origin.x - 28) * scale + offsetX + jitter,
+                    (origin.y - 20) * scale + offsetY + jitter,
+                    56 * scale,
+                    40 * scale,
+                    6 * scale
+                );
+                ctx.fill();
+
+                ctx.fillStyle = 'white';
+                ctx.font = `bold ${12 * scale}px Arial`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(`OR-${name}`, origin.x * scale + offsetX + jitter, origin.y * scale + offsetY + jitter);
+            }
+
+            // Draw animating dots
+            state.animatingDots = state.animatingDots.filter(dot => {
+                const elapsed = Date.now() - dot.startTime;
+                const duration = dot.hit ? 700 : 1500;
+                
+                if (elapsed > duration) return false;
+                
+                const progress = Math.min(1, elapsed / duration);
+                const eased = Math.pow(progress, 0.82);
+                const user = state.users[dot.user];
+                const edge = state.edges[dot.edge];
+                const origin = dot.origin ? state.origins[dot.origin] : null;
+                
+                let x, y;
+                if (dot.hit) {
+                    // Hit: animate user -> edge
+                    x = user.x + (edge.x - user.x) * eased;
+                    y = user.y + (edge.y - user.y) * eased;
+                } else {
+                    // Miss: animate user -> edge -> origin
+                    if (!origin) return false;
+                    if (eased < 0.45) {
+                        const p1 = eased / 0.45;
+                        x = user.x + (edge.x - user.x) * p1;
+                        y = user.y + (edge.y - user.y) * p1;
+                    } else {
+                        const p2 = (eased - 0.45) / 0.55;
+                        x = edge.x + (origin.x - edge.x) * p2;
+                        y = edge.y + (origin.y - edge.y) * p2;
+                    }
+                }
+                
+                ctx.fillStyle = dot.hit ? '#4caf50' : '#f44336';
+                ctx.beginPath();
+                ctx.arc(x * scale + offsetX + jitter, y * scale + offsetY + jitter, 7.5 * scale, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Add glow effect
+                ctx.fillStyle = dot.hit ? 'rgba(76, 175, 80, 0.3)' : 'rgba(244, 67, 54, 0.3)';
+                ctx.beginPath();
+                ctx.arc(x * scale + offsetX + jitter, y * scale + offsetY + jitter, 14 * scale, 0, Math.PI * 2);
+                ctx.fill();
+                
+                return true;
+            });
+
+            // Update metrics
+            updateMetrics();
+        }
+
+        // Updates live KPI cards and per-edge status text in the metrics panel.
+        function updateMetrics() {
+            const hitRate = state.totalRequests > 0 ? ((state.cacheHits / state.totalRequests) * 100).toFixed(1) : 0;
+            const lastLatencies = state.latencyHistory.slice(-50).filter(v => v > 0);
+            const avgLatency = lastLatencies.length > 0 ? 
+                (lastLatencies.reduce((a, b) => a + b, 0) / lastLatencies.length).toFixed(0) : 0;
+            const totalOriginLoad = Object.values(state.origins).reduce((sum, o) => sum + o.load, 0);
+
+            document.getElementById('hitRate').textContent = hitRate;
+            document.getElementById('hitCount').textContent = state.cacheHits;
+            document.getElementById('avgLatency').textContent = avgLatency;
+            document.getElementById('originLoad').textContent = totalOriginLoad.toFixed(1);
+            document.getElementById('originReqs').textContent = state.originRequests;
+            document.getElementById('totalReqs').textContent = state.totalRequests;
+            document.getElementById('originStatus').textContent = `Origin B: ${state.origins.B.active ? 'ACTIVE ✅' : 'DOWN ⚠️'}`;
+            document.getElementById('killOriginBtn').classList.toggle('active', !state.origins.B.active);
+
+            // Update edge status
+            const edgeHtml = Object.entries(state.edges).map(([name, edge]) => `
+                <div style="background: #f5f5f5; padding: 6px 7px; border-radius: 4px; border-left: 3px solid #2E75B6; font-size: 12px; line-height: 1.2;">
+                    <strong>${name}${edge.active ? '' : ' (DOWN)'}</strong> | Cache: ${Object.keys(edge.cache).length} | Load: ${edge.load.toFixed(1)}
+                </div>
+            `).join('');
+            document.getElementById('edgeStatus').innerHTML = edgeHtml;
+
+            // Update charts
+            updateCharts();
+        }
+        // Re-renders latency and hit-rate charts using a sliding request window.
+        function updateCharts() {
+            const windowSize = 300;
+            const xWindow = state.timeHistory.slice(-windowSize);
+            const latencyWindow = state.latencyHistory.slice(-windowSize);
+            const hitRateWindow = state.hitRateHistory.slice(-windowSize);
+            const maxX = xWindow.length > 0 ? xWindow[xWindow.length - 1] : 1;
+            const minX = xWindow.length > 0 ? Math.max(0, xWindow[0]) : 0;
+
+            // Latency chart
+            Plotly.react('latencyChart', [{
+                x: xWindow,
+                y: latencyWindow,
+                mode: 'lines',
+                line: { color: '#2E75B6', width: 2 },
+                fill: 'tozeroy'
+            }], {
+                margin: { l: 40, r: 15, t: 8, b: 28 },
+                xaxis: { title: 'Requests', showgrid: false, range: [minX, maxX], rangemode: 'tozero' },
+                yaxis: { title: 'ms', rangemode: 'tozero' }
+            }, { responsive: true, displayModeBar: false });
+
+            // Hit rate chart
+            Plotly.react('hitRateChart', [{
+                x: xWindow,
+                y: hitRateWindow,
+                mode: 'lines',
+                line: { color: '#4caf50', width: 2 },
+                fill: 'tozeroy'
+            }], {
+                margin: { l: 40, r: 15, t: 8, b: 28 },
+                xaxis: { title: 'Requests', showgrid: false, range: [minX, maxX], rangemode: 'tozero' },
+                yaxis: { title: '%', range: [0, 100] }
+            }, { responsive: true, displayModeBar: false });
+        }
+
+        // =====================================================================
+        // ANIMATION LOOP
+        // =====================================================================
+        // Runs the main animation loop (step simulation, draw frame, repeat).
+        function animate() {
+            if (state.running) {
+                simulateStep();
+            }
+            draw();
+            requestAnimationFrame(animate);
+        }
+
+        animate();
+    </script>
+</body>
+</html>
